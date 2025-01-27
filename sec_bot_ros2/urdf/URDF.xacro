@@ -1,0 +1,148 @@
+<?xml version="1.0" ?>
+<robot name="URDF" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find sec_bot_ros2)/urdf/materials.xacro" />
+<xacro:include filename="$(find sec_bot_ros2)/urdf/URDF.trans" />
+<xacro:include filename="$(find sec_bot_ros2)/urdf/URDF.gazebo" />
+
+<link name="base_link">
+</link>
+
+<link name="chassis_link">
+  <inertial>
+    <origin xyz="0.04504205168611186 -0.10640675775121805 0.04650755178057449" rpy="0 0 0"/>
+    <mass value="24.793274274326507"/>
+    <inertia ixx="0.107504" iyy="0.069836" izz="0.130887" ixy="-0.0" iyz="-0.002149" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="right_wheel_link">
+  <inertial>
+    <origin xyz="-0.030541948313887957 -0.001957133202892432 -0.007340509604943389" rpy="0 0 0"/>
+    <mass value="2.6048711836780614"/>
+    <inertia ixx="0.005503" iyy="0.002887" izz="0.002887" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.075 0.065937 -0.03563" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/right_wheel_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.075 0.065937 -0.03563" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/right_wheel_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lidar_link">
+  <inertial>
+    <origin xyz="5.168611249412036e-08 3.1405673649176347e-07 0.01507070000103726" rpy="0 0 0"/>
+    <mass value="0.3338072393147599"/>
+    <inertia ixx="6.5e-05" iyy="6.5e-05" izz="7.2e-05" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 0.079076 -0.100631" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/lidar_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 0.079076 -0.100631" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/lidar_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="caster_link">
+  <inertial>
+    <origin xyz="5.1686111966764425e-08 -0.005719774129112509 -0.008865869018679712" rpy="0 0 0"/>
+    <mass value="0.03528730682813397"/>
+    <inertia ixx="2e-06" iyy="2e-06" izz="2e-06" ixy="-0.0" iyz="-1e-06" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 0.196024 0.01" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/caster_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 0.196024 0.01" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/caster_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="left_wheel_link">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="2.6048711836780614"/>
+    <inertia ixx="0.005503" iyy="0.002887" izz="0.002887" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.075 0.065937 -0.03563" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/left_wheel_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.075 0.065937 -0.03563" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file:/home/fionn/sec_bot_ws/src/sec_bot_ros2/meshes/left_wheel_link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="chassis_joint" type="fixed">
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="chassis_link"/>
+</joint>
+
+<joint name="right_wheel_joint" type="continuous">
+  <origin xyz="0.075 -0.065937 0.03563" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="right_wheel_link"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+</joint>
+
+<joint name="lidar_joint" type="fixed">
+  <origin xyz="0.0 -0.079076 0.100631" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="lidar_link"/>
+</joint>
+
+<joint name="caster_joint" type="fixed">
+  <origin xyz="0.0 -0.196024 -0.01" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="caster_link"/>
+</joint>
+
+<joint name="left_wheel_joint" type="continuous">
+  <origin xyz="-0.075 -0.065937 0.03563" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="left_wheel_link"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+</joint>
+
+</robot>
