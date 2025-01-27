@@ -114,11 +114,7 @@ Visualization Manager:
           Value: true
         chassis_link:
           Value: true
-        left_wheel_link:
-          Value: true
         lidar_link:
-          Value: true
-        right_wheel_link:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -131,11 +127,7 @@ Visualization Manager:
             {}
           chassis_link:
             {}
-          left_wheel_link:
-            {}
           lidar_link:
-            {}
-          right_wheel_link:
             {}
       Update Interval: 0
       Value: true
@@ -185,7 +177,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.716734766960144
+      Distance: 10
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -221,5 +213,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 394
-  Y: 109
+  X: 412
+  Y: 108
