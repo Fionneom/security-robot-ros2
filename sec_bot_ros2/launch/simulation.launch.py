@@ -21,9 +21,9 @@ def generate_launch_description():
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')),
-        # launch_arguments={
-        #     'gz_args': '-r /carProject_ws/src/sec_bot_ros2/description/onshapeTest/world.sdf'
-        # }.items(),
+        launch_arguments={
+            'gz_args': '-r /home/fionn/sec_bot_ws/src/sec_bot_ros2/urdf/world.sdf'
+        }.items(),
     )
 
     base = IncludeLaunchDescription(
