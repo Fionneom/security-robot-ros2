@@ -38,7 +38,7 @@ setup(
     entry_points={
         'console_scripts': [
             'odom_publisher = sec_bot_control_ros2.odom_publisher:main',
-            'car_controller = sec_bot_control_ros2.car_controller:main',
+            'robot_controller = sec_bot_control_ros2.robot_controller:main',
             #'hardware_interface = sec_bot_control_ros2.hardware_interface:main',
         ],
     },

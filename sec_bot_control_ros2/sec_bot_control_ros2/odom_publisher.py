@@ -1,6 +1,5 @@
 """\
-ROS 2 node to update the cars position in the world based on the wheel angle and wheel speed.
-Uses a few equations that I don't fully understand, but they seem to work
+ROS 2 node to update the robot's position in the world based on wheel speed.
 """
 
 import rclpy
@@ -25,12 +24,12 @@ class OdomPublisher(Node):
         self.transform_broadcaster = TransformBroadcaster(self)
         self.odom_publisher = self.create_publisher(Odometry, 'odom', 10)
         
-        self.joint_state_subscription_ = self.create_subscription(sensor_msgs.msg.JointState, 'joint_states', self.joint_callback, 10)
+        self.joint_state_subscription = self.create_subscription(sensor_msgs.msg.JointState, 'joint_states', self.joint_callback, 10)
         
         timer_period = 0.1  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
-        # Position of the car in x and y and angle (radians) relative to the world origin
+        # Position of the robot in x and y and angle (radians) relative to the world origin
         self.odom_x = 0.0
         self.odom_y = 0.0
         self.odom_theta = 0.0
@@ -40,27 +39,23 @@ class OdomPublisher(Node):
         self.y_vel = 0.0
         self.theta_vel = 0.0
 
-        # Forward velocity of the car
-        self.speed = 0.0
-        # Current angle of the wheels
-        self.steering_angle = 0.0
+        self.left_wheel_speed = 0.0
+        self.right_wheel_speed = 0.0
 
-        # Distance between front and back wheels
-        self.wheel_base = 0.77
+        # Distance between wheels
+        self.wheel_track = 0.2
         # Diameter of the wheels
-        self.wheel_diameter = 0.305
+        self.wheel_diameter = 0.13
 
         # Timer used to make sure everything stays in sync (converting nanoseconds to seconds)
         self.t1 = self.get_clock().now().nanoseconds * 1e-9
 
-    # Updates the cars position based on the speed and steering angle every 0.1 seconds
+    # Updates the robot's position based on the speed of each wheel every 0.1 seconds
     def timer_callback(self):
+        self.y_vel = ((self.wheel_diameter * m.cos(self.odom_theta) / 4) * (self.right_wheel_speed + self.left_wheel_speed))
+        self.x_vel = ((self.wheel_diameter * m.sin(self.odom_theta) / 4) * (self.right_wheel_speed + self.left_wheel_speed))
 
-        # Kinematic equations for ackermann motion. I just got it off google
-        self.y_vel = self.speed * m.cos(self.odom_theta)
-        self.x_vel = self.speed * m.sin(self.odom_theta)
-
-        self.theta_vel = (self.speed / self.wheel_base) * m.tan(self.steering_angle)
+        self.theta_vel = (self.wheel_diameter / (2 * self.wheel_track)) * (self.right_wheel_speed - self.left_wheel_speed)
 
         t2 = self.get_clock().now().nanoseconds * 1e-9
 
@@ -70,20 +65,18 @@ class OdomPublisher(Node):
 
         self.t1 = t2
 
-        # Publishes a transform, basically position and rotation of the car relative to the origin
+        # Publishes a transform, position and rotation of the robot relative to the origin
         self.publish_transform()
         
         # Can also publish a specific odom message for use when merging odometry with the IMU (not necesarry right now)
         # self.publish_odom()
         
-    # Updates wheel speed and steering angle based on the joint_states topic (updated by car_controller)
+    # Updates wheel speed based on the joint_states topic (updated by car_controller)
     def joint_callback(self, msg):
-        # This try-except prevents the code from crashing if wheel speed and angle haven't been received yet
+        # This try-except prevents the code from crashing if wheel speeds haven't been received yet
         try:
-            wheel_angular_velocity = msg.velocity[msg.name.index("back_right_wheel_joint")]
-            self.speed = -(wheel_angular_velocity * self.wheel_diameter) / 2
-
-            self.steering_angle = msg.position[msg.name.index("right_steering_joint")]
+            self.right_wheel_speed = msg.velocity[msg.name.index("right_wheel_joint")]
+            self.right_wheel_speed = msg.velocity[msg.name.index("left_wheel_joint")]
         except:
             self.get_logger().info('Joint data not available')
         
@@ -98,15 +91,14 @@ class OdomPublisher(Node):
         odom_transform.transform.translation.x = float(self.odom_x)
         odom_transform.transform.translation.y = float(self.odom_y)
 
-        # Quaternions are a pain but they're what ROS uses for angles. Invented by an Irish guy yup yup
-        # The function down below converts roll pitch and yaw into quaternions. We only need the z and ω component
+        # Converts roll pitch and yaw into quaternions. We only need the z and ω component
         q = quaternion_from_euler(0, 0, -self.odom_theta)
         odom_transform.transform.rotation.z = q[2]
         odom_transform.transform.rotation.w = q[3]
 
         self.transform_broadcaster.sendTransform(odom_transform)
 
-    # Not currently used, but ready to go when you want to use the IMU
+    # Not currently used
     def publish_odom(self):
         odom_message = Odometry()
 
@@ -129,7 +121,6 @@ class OdomPublisher(Node):
 
         self.odom_publisher.publish(odom_message)
 
-# I got this off the internet and it works
 def quaternion_from_euler(ai, aj, ak):
     ai /= 2.0
     aj /= 2.0
