@@ -32,9 +32,17 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}]
     )
 
+    node_hardware_interface = Node(
+        package='sec_bot_control_ros2',
+        executable='hardware_interface',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}]
+    )
+
     # Launch!
     return LaunchDescription([
         node_joint_state_publisher,
         node_odom_publisher,
         node_robot_controller,
+        node_hardware_interface
     ])
