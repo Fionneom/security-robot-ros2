@@ -1,0 +1,104 @@
+"""\
+ROS 2 node responsible for passing messages to and from the hardware interface/simulation.
+Takes in Velocity values, calculates wheel speeds
+"""
+
+import rclpy
+from rclpy.node import Node
+
+import std_msgs.msg
+import sensor_msgs.msg
+import geometry_msgs.msg
+
+import numpy as np
+
+class RobotController(Node):
+
+    def __init__(self):
+        super().__init__('robot_controller')
+
+        self.simulation_mode = self.get_parameter('use_sim_time').get_parameter_value().bool_value
+
+        self.command_subscription = self.create_subscription(geometry_msgs.msg.Twist, 'cmd_vel', self.command_callback, 10)
+        
+        if self.simulation_mode:
+            pass
+        else:
+            self.motor_write_publisher = self.create_publisher(std_msgs.msg.Float32MultiArray, 'robot_control/wheel_speeds_set', 10)
+            self.motor_feedback_subscriber = self.create_subscription(std_msgs.msg.Float32MultiArray, 'robot_control/motor_feedback', self.motor_feedback_callback, 10)
+
+            self.joint_publisher = self.create_publisher(sensor_msgs.msg.JointState, 'robot_control/joint_states', 10)
+
+        self.wheel_diameter = 0.13
+        self.wheel_track = 0.2
+
+        self.left_wheel_position = 0
+        self.right_wheel_position = 0
+
+        self.t1 = self.get_clock().now().nanoseconds * 1e-9
+
+    def command_callback(self, msg):
+        linear_velocity = msg.linear
+        angular_velocity = msg.angular
+
+        self.get_logger().info('Linear: ' + str(linear_velocity) + '  Angular: ' + str(angular_velocity))
+
+        wheel_speeds = self.twist_to_wheel_velocity(linear_velocity.x, angular_velocity.z)
+
+        self.get_logger().info('Left: ' + str(wheel_speeds[1]) + '  Right: ' + str(wheel_speeds[0]))
+
+        if self.simulation_mode:
+            msg_out = std_msgs.msg.Float32MultiArray()
+            msg_out.data = [wheel_speeds[1], wheel_speeds[0]]
+
+            self.motor_feedback_callback(msg_out)
+        else:
+            msg_out = std_msgs.msg.Float32MultiArray()
+            msg_out.data = [wheel_speeds[1], wheel_speeds[0]]
+
+            self.motor_write_publisher.publish(msg_out)
+
+    def motor_feedback_callback(self, msg):
+        left_wheel_speed = msg.data[0]
+        right_wheel_speed = msg.data[1]
+
+        t2 = self.get_clock().now().nanoseconds * 1e-9
+        self.left_wheel_position += left_wheel_speed * (t2 - self.t1)
+        self.right_wheel_position += left_wheel_speed * (t2 - self.t1)
+        self.t1 = t2
+
+        msg = sensor_msgs.msg.JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = ["right_wheel_joint", "left_wheel_joint"]
+        msg.position = [float(right_wheel_position), float(left_wheel_position)]
+        
+        msg.velocity = [float(right_wheel_speed), float(left_wheel_speed)]
+
+        self.joint_publisher.publish(msg)
+        
+    def twist_to_wheel_velocity(self, linear_velocity, angular_velocity):
+        coefficients = np.array([[1, 1], [1, -1]])
+        constants = np.array([(4 * linear_velocity) / self.wheel_diameter, (2 * self.wheel_track * angular_velocity) / self.wheel_diameter])
+
+        wheel_speeds = np.linalg.solve(coefficients, constants)
+
+        return(wheel_speeds)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+
+    robot_controller = RobotController()
+
+    try:
+        rclpy.spin(robot_controller)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        robot_controller.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

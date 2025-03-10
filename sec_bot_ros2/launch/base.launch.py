@@ -26,6 +26,14 @@ def generate_launch_description():
                 launch_arguments = {'use_sim_time': use_sim_time}.items()
     )
 
+    rviz = Node(
+        package='rviz2',
+        namespace='',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', [os.path.join(get_package_share_directory('sec_bot_ros2'), 'rviz', 'rviz_config.rviz')]]
+    )
+
     # control = IncludeLaunchDescription(
     #             PythonLaunchDescriptionSource([os.path.join(
     #                 get_package_share_directory('sec_bot_ros2_control'),'launch','control.launch.py'
@@ -43,6 +51,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         rsp,
+        rviz,
         # control,
         # foxglove,
     ])
