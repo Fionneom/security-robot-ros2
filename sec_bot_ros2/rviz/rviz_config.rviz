@@ -114,7 +114,13 @@ Visualization Manager:
           Value: true
         chassis_link:
           Value: true
+        left_wheel_link:
+          Value: true
         lidar_link:
+          Value: true
+        odom:
+          Value: true
+        right_wheel_link:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -122,19 +128,24 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        base_link:
-          caster_link:
-            {}
-          chassis_link:
-            {}
-          lidar_link:
-            {}
+        odom:
+          base_link:
+            caster_link:
+              {}
+            chassis_link:
+              {}
+            left_wheel_link:
+              {}
+            lidar_link:
+              {}
+            right_wheel_link:
+              {}
       Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -177,7 +188,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 10
+      Distance: 5.996953964233398
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -213,5 +224,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 412
-  Y: 108
+  X: 115
+  Y: 159

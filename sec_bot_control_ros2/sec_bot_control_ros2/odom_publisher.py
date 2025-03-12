@@ -55,7 +55,7 @@ class OdomPublisher(Node):
         self.y_vel = ((self.wheel_diameter * m.cos(self.odom_theta) / 4) * (self.right_wheel_speed + self.left_wheel_speed))
         self.x_vel = ((self.wheel_diameter * m.sin(self.odom_theta) / 4) * (self.right_wheel_speed + self.left_wheel_speed))
 
-        self.theta_vel = (self.wheel_diameter / (2 * self.wheel_track)) * (self.right_wheel_speed - self.left_wheel_speed)
+        self.theta_vel = (self.wheel_diameter / (2 * self.wheel_track)) * (self.left_wheel_speed - self.right_wheel_speed)
 
         t2 = self.get_clock().now().nanoseconds * 1e-9
 
@@ -71,12 +71,12 @@ class OdomPublisher(Node):
         # Can also publish a specific odom message for use when merging odometry with the IMU (not necesarry right now)
         # self.publish_odom()
         
-    # Updates wheel speed based on the joint_states topic (updated by car_controller)
+    # Updates wheel speed based on the joint_states topic
     def joint_callback(self, msg):
-        # This try-except prevents the code from crashing if wheel speeds haven't been received yet
+        # Prevents the code from crashing if wheel speeds haven't been received yet
         try:
             self.right_wheel_speed = msg.velocity[msg.name.index("right_wheel_joint")]
-            self.right_wheel_speed = msg.velocity[msg.name.index("left_wheel_joint")]
+            self.left_wheel_speed = msg.velocity[msg.name.index("left_wheel_joint")]
         except:
             self.get_logger().info('Joint data not available')
         

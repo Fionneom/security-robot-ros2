@@ -16,8 +16,8 @@ import math as m
 CW = 1
 CCW = 0
 
-RIGHT = 1
-LEFT = 0
+RIGHT = 0
+LEFT = 1
 
 class HardwareInterface(Node):
 
@@ -54,27 +54,32 @@ class HardwareInterface(Node):
         lgpio.gpio_claim_output(self.h, self.PWMB_PIN)
 
         lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
-        lgpio.gpio_write(self.h, self.AIN2_PIN, 0)
+        lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
         lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
-        lgpio.gpio_write(self.h, self.BIN2_PIN, 0)
+        lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
 
         self.acceleration = 2
         self.max_rpm = 150
-
-        self.left_target_speed_rpm = 0
-        self.left_current_speed_rpm = 0
-        self.left_target_speed_per = 0
-        self.left_current_speed_per = 0
 
         self.right_target_speed_rpm = 0
         self.right_current_speed_rpm = 0
         self.right_target_speed_per = 0
         self.right_current_speed_per = 0
 
+        self.left_target_speed_rpm = 0
+        self.left_current_speed_rpm = 0
+        self.left_target_speed_per = 0
+        self.left_current_speed_per = 0
+
+        self.direction_flag_r = False
+        self.direction_flag_l = False
+
         timer_period = 0.05  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         self.motor_speed_subscription = self.create_subscription(std_msgs.msg.Float32MultiArray, 'robot_control/wheel_speeds_set', self.motor_speed_set_callback, 10) 
+
+        self.wheel_speed_publisher = self.create_publisher(std_msgs.msg.Float32MultiArray, 'robot_control/motor_feedback', 10)
 
 
     def timer_callback(self):
@@ -87,39 +92,56 @@ class HardwareInterface(Node):
         lgpio.tx_pwm(self.h, self.PWMB_PIN, 1000, abs(self.left_current_speed_per))
 
         if self.right_target_speed_per > self.right_current_speed_per:
-            self.set_direction(CW, RIGHT)
             if self.right_target_speed_per - self.right_current_speed_per > self.acceleration:
+                self.set_direction(CW, RIGHT)
                 self.right_current_speed_per += self.acceleration
             else:
                 self.right_current_speed_per = self.right_target_speed_per
 
         elif self.right_target_speed_per < self.right_current_speed_per:
-            self.set_direction(CCW, RIGHT)
             if abs(self.right_target_speed_per - self.right_current_speed_per) > self.acceleration:
+                self.set_direction(CCW, RIGHT)
                 self.right_current_speed_per -= self.acceleration
             else:
                 self.right_current_speed_per = self.right_target_speed_per
 
+        if self.right_current_speed_per == 0 and self.left_target_speed_per == 0:
+                lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
+                lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
+                if self.direction_flag_r:
+                    self.get_logger().info("Right Motor Brake")
+                    self.direction_flag_r = False
+
         if self.left_target_speed_per > self.left_current_speed_per:
-            self.set_direction(CW, LEFT)
             if self.left_target_speed_per - self.left_current_speed_per > self.acceleration:
+                self.set_direction(CW, LEFT)
                 self.left_current_speed_per += self.acceleration
             else:
                 self.left_current_speed_per = self.left_target_speed_per
 
         elif self.left_target_speed_per < self.left_current_speed_per:
-            self.set_direction(CCW, LEFT)
             if abs(self.left_target_speed_per - self.left_current_speed_per) > self.acceleration:
+                self.set_direction(CCW, LEFT)
                 self.left_current_speed_per -= self.acceleration
             else:
                 self.left_current_speed_per = self.left_target_speed_per
 
+        if self.left_current_speed_per == 0 and self.left_target_speed_per == 0:
+                lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
+                lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
+                if self.direction_flag_l:
+                    self.get_logger().info("Left Motor Brake")
+                    self.direction_flag_l = False
+
+        self.publish_wheel_speeds()
+
         # self.get_logger().info(str(m1a) + " " +str(m1b) + " " +str(m2a) + " " +str(m2b) + " ")
-        self.get_logger().info("Current Speed: " + str(self.right_current_speed_per) + " Target Speed: " + str(self.right_target_speed_per))
+        # self.get_logger().info("Current Speed: " + str(self.right_current_speed_per) + " Target Speed: " + str(self.right_target_speed_per))
+
 
     def motor_speed_set_callback(self, msg):
-        left_target_speed_rads = msg.data[0]
-        right_target_speed_rads = msg.data[1]
+        right_target_speed_rads = msg.data[0]
+        left_target_speed_rads = msg.data[1]
 
         self.left_target_speed_rpm = (left_target_speed_rads / (2 * m.pi)) * 60
         self.right_target_speed_rpm = (right_target_speed_rads / (2 * m.pi)) * 60
@@ -130,24 +152,41 @@ class HardwareInterface(Node):
         
     def set_direction(self, direction, motor):
         if motor == RIGHT:
-            if self.right_current_speed_per < 3 and self.right_current_speed_per > -3:
+            if self.right_current_speed_per < self.acceleration and self.right_current_speed_per > -self.acceleration:
+                self.direction_flag_r = True
                 if direction == CW:
                     lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
                     lgpio.gpio_write(self.h, self.AIN2_PIN, 0)
+                    self.get_logger().info("Right Motor CW")
                 elif direction == CCW:
                     lgpio.gpio_write(self.h, self.AIN1_PIN, 0)
                     lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
+                    self.get_logger().info("Right Motor CCW")
 
         elif motor == LEFT:
-            if self.left_current_speed_per < 3 and self.left_current_speed_per > -3:
+            if self.left_current_speed_per < self.acceleration and self.left_current_speed_per > -self.acceleration:
+                self.direction_flag_l = True
                 if direction == CW:
                     lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
                     lgpio.gpio_write(self.h, self.BIN2_PIN, 0)
+                    self.get_logger().info("Left Motor CW")
                 elif direction == CCW:
                     lgpio.gpio_write(self.h, self.BIN1_PIN, 0)
                     lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
+                    self.get_logger().info("Left Motor CCW")
 
 
+    def publish_wheel_speeds(self):
+        self.right_current_speed_rpm = (self.right_current_speed_per / 100) * self.max_rpm
+        self.left_current_speed_rpm = (self.left_current_speed_per / 100) * self.max_rpm
+
+        right_current_speed_rads = (self.right_current_speed_rpm / 60) * 2 * m.pi
+        left_current_speed_rads = (self.left_current_speed_rpm / 60) * 2 * m.pi
+
+        msg_out = std_msgs.msg.Float32MultiArray()
+        msg_out.data = [right_current_speed_rads, left_current_speed_rads]
+
+        self.wheel_speed_publisher.publish(msg_out)
 
 
 def main(args=None):
@@ -155,7 +194,7 @@ def main(args=None):
 
     hardware_interface = HardwareInterface()
 
-    # This code prevents an error when th system is stopped with ctrl - c
+    # This code prevents an error when the system is stopped with ctrl - c
     try:
         rclpy.spin(hardware_interface)
     except KeyboardInterrupt:
