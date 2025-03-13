@@ -41,6 +41,7 @@ def generate_launch_description():
         {'angle_crop_max': 225.0},  # unit is degress
         {'range_min': 0.02}, # unit is meter
         {'range_max': 12.0}   # unit is meter
+        {'range_max': 12.0}
       ]
   )
 
