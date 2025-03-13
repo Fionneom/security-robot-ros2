@@ -24,24 +24,21 @@ Parameter Description:
 def generate_launch_description():
   # LDROBOT LiDAR publisher node
   ldlidar_node = Node(
-      package='ldlidar_ros2',
-      executable='ldlidar_ros2_node',
-      name='ldlidar_publisher_ld06',
+      package='ldlidar_stl_ros2',
+      executable='ldlidar_stl_ros2_node',
+      name='LD06',
       output='screen',
       parameters=[
         {'product_name': 'LDLiDAR_LD06'},
-        {'laser_scan_topic_name': 'scan'},
-        {'point_cloud_2d_topic_name': 'pointcloud2d'},
+        {'topic_name': 'scan'},
         {'frame_id': 'base_laser'},
         {'port_name': '/dev/ttyS0'},
-        {'serial_baudrate': 230400},
+        {'port_baudrate': 230400},
         {'laser_scan_dir': True},
         {'enable_angle_crop_func': False},
-        {'angle_crop_min': 135.0},  # unit is degress
-        {'angle_crop_max': 225.0},  # unit is degress
-        {'range_min': 0.02}, # unit is meter
-        {'range_max': 12.0}   # unit is meter
-        {'range_max': 12.0}
+        {'angle_crop_min': 135.0},
+        {'angle_crop_max': 225.0},
+        {'bins': 454}
       ]
   )
 
