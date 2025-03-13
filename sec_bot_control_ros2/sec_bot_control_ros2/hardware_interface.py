@@ -3,7 +3,7 @@ ROS 2 node responsible for reading and writing to the Pico.
 Uses the MainController python class (see submodules folder)
 Also subscribes to lidar and radar safety nodes to stop when and object is detected
 """
-
+import lgpio
 
 import rclpy
 from rclpy.node import Node
@@ -11,146 +11,182 @@ from rclpy.node import Node
 import std_msgs.msg
 import std_srvs.srv
 
-# import CarControllers.MainControllers as PicoController
-from .submodules.MainController import Main_Controller
+import math as m
+
+CW = 1
+CCW = 0
+
+RIGHT = 0
+LEFT = 1
 
 class HardwareInterface(Node):
 
     def __init__(self):
         super().__init__('HardwareInterface')
 
-        # Individual controller for both speed and steering picos
-        self.speed_controller = Main_Controller('/dev/serial/by-id/usb-Raspberry_Pi_Picoprobe__CMSIS-DAP__E6614103E74C5C36-if01')
-        self.steering_controller = Main_Controller('/dev/serial/by-id/usb-Raspberry_Pi_Picoprobe__CMSIS-DAP__E6609CB2D32B5728-if01')
+        # ME = Motor Encoder
+        self.ME1A_PIN = 21
+        self.ME1B_PIN = 20
+        self.ME2A_PIN = 16
+        self.ME2B_PIN = 25
 
-        # Calibration service allows car to be calibrated on command
-        self.calibration_service = self.create_service(std_srvs.srv.Trigger, 'calibrate_steering', self.calibration_service_callback)
+        # Motor Driver
+        self.PWMA_PIN = 18
+        self.AIN2_PIN = 23
+        self.AIN1_PIN = 24
+        self.BIN1_PIN = 8
+        self.BIN2_PIN = 7
+        self.PWMB_PIN = 13
 
-        # Write PID values for speed control
-        self.speed_controller.Write_KP(1200)
-        self.speed_controller.Write_KI(1000) #112
-        self.speed_controller.Write_KD(100) #15
+        self.h = lgpio.gpiochip_open(0)
 
-        # Trigger steering calibration
-        self.steering_controller.Write_Calibration(0)
+        lgpio.gpio_claim_input(self.h, self.ME1A_PIN)
+        lgpio.gpio_claim_input(self.h, self.ME1B_PIN)
+        lgpio.gpio_claim_input(self.h, self.ME2A_PIN)
+        lgpio.gpio_claim_input(self.h, self.ME2B_PIN)
 
-        self.pico_writes_subscriber = self.create_subscription(std_msgs.msg.Float32MultiArray, 'car_control/pico_write', self.pico_write_callback, 10)
-        
-        self.lidar_blocking_subscriber = self.create_subscription(std_msgs.msg.Int32MultiArray, 'lidar_blocking', self.lidar_blocking_callback, 10)
-        self.radar_blocking_subscriber = self.create_subscription(std_msgs.msg.Int32MultiArray, 'radar_blocking', self.radar_blocking_callback, 10)
+        lgpio.gpio_claim_output(self.h, self.AIN1_PIN)
+        lgpio.gpio_claim_output(self.h, self.AIN2_PIN)
+        lgpio.gpio_claim_output(self.h, self.BIN1_PIN)
+        lgpio.gpio_claim_output(self.h, self.BIN2_PIN)
 
-        self.pico_read_publisher = self.create_publisher(std_msgs.msg.Float32MultiArray, 'car_control/pico_read', 10)
+        lgpio.gpio_claim_output(self.h, self.PWMA_PIN)
+        lgpio.gpio_claim_output(self.h, self.PWMB_PIN)
 
-        # Turbo mode is redundant now and could probably be removed but I don't want to break anything
-        self.speed_service = self.create_service(std_srvs.srv.SetBool, 'turbo_mode', self.turbo_mode_callback)
+        lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
+        lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
+        lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
+        lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
 
-        # Timer callback used to continuously update speed and steering angle and read back results every 0.1 seconds
-        timer_period = 0.1  # seconds
+        self.acceleration = 2
+        self.max_rpm = 150
+
+        self.right_target_speed_rpm = 0
+        self.right_current_speed_rpm = 0
+        self.right_target_speed_per = 0
+        self.right_current_speed_per = 0
+
+        self.left_target_speed_rpm = 0
+        self.left_current_speed_rpm = 0
+        self.left_target_speed_per = 0
+        self.left_current_speed_per = 0
+
+        self.direction_flag_r = False
+        self.direction_flag_l = False
+
+        timer_period = 0.05  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
-        self.target_wheel_speed_counts = 0
-        # There are 100 segments on the back wheel
-        self.counts_per_revolution = 100
+        self.motor_speed_subscription = self.create_subscription(std_msgs.msg.Float32MultiArray, 'robot_control/wheel_speeds_set', self.motor_speed_set_callback, 10) 
 
-        self.lidar_forward_blocking = False
-        self.lidar_reverse_blocking = False
-        self.radar_forward_blocking = False
-
-        # Might need to update counts to 15, but again, I don't want to break anything. This might slightly improve car position estimate
-        self.steering_counts = 14
-        # The car has a maximum steering angle of approx 0.456 radians to the right and left
-        self.total_steering_angle_rad = 0.912
-        self.target_steering_angle_counts = 0
+        self.wheel_speed_publisher = self.create_publisher(std_msgs.msg.Float32MultiArray, 'robot_control/motor_feedback', 10)
 
 
-    # Callback updates wheel speed and angle when a message is received on the pico write topic
-    def pico_write_callback(self, msg):
-        wheel_speed_rad = msg.data[0]
-        # Set to negative to correct the wheels turning the wrong way. Would be better to update in the URDF file but it works for now
-        target_steering_angle_rad = -msg.data[1]
-
-        # Wheel speed from rad to count per 0.25 seconds (Blame James and Frank for weird unit lol)
-        wheel_speed_counts = int((25 / (2 * 3.1415926535)) * wheel_speed_rad)
-
-        # Converts steering angle in radians to counts based on the maximum steering angle and total number of counts
-        self.target_steering_angle_counts = int(((target_steering_angle_rad / self.total_steering_angle_rad) + 0.5) * self.steering_counts)
-
-        # Checking value close to zero should prevent rounding errors
-        if wheel_speed_counts > -0.01 and wheel_speed_counts < 0.01:
-            self.target_wheel_speed_counts = 0
-            self.speed_controller.EMERGENCY_STOP()
-        else:
-            self.target_wheel_speed_counts = wheel_speed_counts
-
-    # Ros service to stop car and trigger calibration
-    def calibration_service_callback(self, request, response):
-        self.get_logger().info('Calibration triggered')
-
-        self.target_wheel_speed_counts = 0
-        self.speed_controller.EMERGENCY_STOP()
-        self.steering_controller.Write_Calibration(0)
-
-        response.success = True
-        return response
-
-    # Again, could probably be removed
-    def turbo_mode_callback(self, request, response):
-        self.turbo_mode = request.data
-        response.success = True
-
-        if self.turbo_mode:
-            self.speed_controller.Write_KP(500)
-            self.speed_controller.Write_KI(500) #112
-            self.speed_controller.Write_KD(500) #15 #15
-        else:
-            self.speed_controller.Write_KP(500)
-            self.speed_controller.Write_KI(500) #112
-            self.speed_controller.Write_KD(500) #15
-
-        response.message = str(self.turbo_mode)
-
-        return response
-
-    # Updates when the lidar safety system updates
-    def lidar_blocking_callback(self, msg):
-        self.lidar_forward_blocking = msg.data[0]
-        self.lidar_reverse_blocking = msg.data[1]
-
-    # Updates when radar safety system updates
-    def radar_blocking_callback(self, msg):
-        self.radar_forward_blocking = msg.data[0]
-
-    # As mentioned above, continuosly write wheel speed and angle to the pico amd reads the actual speed and steering angle
     def timer_callback(self):
-        if (self.lidar_forward_blocking or self.radar_forward_blocking) and self.target_wheel_speed_counts > 0:
-            self.target_wheel_speed_counts = 0
-            self.speed_controller.EMERGENCY_STOP()
-
-        if self.lidar_reverse_blocking and self.target_wheel_speed_counts < 0:
-            self.target_wheel_speed_counts = 0
-            self.speed_controller.EMERGENCY_STOP()
+        m1a = lgpio.gpio_read(self.h, self.ME1A_PIN)
+        m1b = lgpio.gpio_read(self.h, self.ME1B_PIN)
+        m2a = lgpio.gpio_read(self.h, self.ME2A_PIN)
+        m2b = lgpio.gpio_read(self.h, self.ME2B_PIN)
         
-        # See MainController.py for the source code for reads and writes
-        self.speed_controller.Write_SetSpeed(self.target_wheel_speed_counts)
-        self.steering_controller.Write_SetTarget(self.target_steering_angle_counts)
+        lgpio.tx_pwm(self.h, self.PWMA_PIN, 1000, abs(self.right_current_speed_per))
+        lgpio.tx_pwm(self.h, self.PWMB_PIN, 1000, abs(self.left_current_speed_per))
 
-        actual_wheel_speed_counts = self.speed_controller.Read_Current_Count_Speed()
-        actual_steering_angle_counts = self.steering_controller.Read_Current_Count()
+        if self.right_target_speed_per > self.right_current_speed_per:
+            if self.right_target_speed_per - self.right_current_speed_per > self.acceleration:
+                self.set_direction(CW, RIGHT)
+                self.right_current_speed_per += self.acceleration
+            else:
+                self.right_current_speed_per = self.right_target_speed_per
 
-        # Conversion from counts per 0.25 seconds to radians per second
-        actual_wheel_speed_rad = actual_wheel_speed_counts * ((8 * 3.141592653) / self.counts_per_revolution)
-        # Conversion from counts to radians
-        actual_steering_angle_rad = ((actual_steering_angle_counts * self.total_steering_angle_rad) / self.steering_counts) - (self.total_steering_angle_rad / 2)
+        elif self.right_target_speed_per < self.right_current_speed_per:
+            if abs(self.right_target_speed_per - self.right_current_speed_per) > self.acceleration:
+                self.set_direction(CCW, RIGHT)
+                self.right_current_speed_per -= self.acceleration
+            else:
+                self.right_current_speed_per = self.right_target_speed_per
 
-        self.get_logger().info('Current speed: %f' % (actual_wheel_speed_rad))
-        self.get_logger().info('Current angle: %f' % (actual_steering_angle_rad))
+        if self.right_current_speed_per == 0 and self.left_target_speed_per == 0:
+                lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
+                lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
+                if self.direction_flag_r:
+                    self.get_logger().info("Right Motor Brake")
+                    self.direction_flag_r = False
 
-        # Publish output to Car Controller
-        msg = std_msgs.msg.Float32MultiArray()
-        msg.data = [actual_wheel_speed_rad, -actual_steering_angle_rad]
+        if self.left_target_speed_per > self.left_current_speed_per:
+            if self.left_target_speed_per - self.left_current_speed_per > self.acceleration:
+                self.set_direction(CW, LEFT)
+                self.left_current_speed_per += self.acceleration
+            else:
+                self.left_current_speed_per = self.left_target_speed_per
 
-        self.pico_read_publisher.publish(msg)
+        elif self.left_target_speed_per < self.left_current_speed_per:
+            if abs(self.left_target_speed_per - self.left_current_speed_per) > self.acceleration:
+                self.set_direction(CCW, LEFT)
+                self.left_current_speed_per -= self.acceleration
+            else:
+                self.left_current_speed_per = self.left_target_speed_per
 
+        if self.left_current_speed_per == 0 and self.left_target_speed_per == 0:
+                lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
+                lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
+                if self.direction_flag_l:
+                    self.get_logger().info("Left Motor Brake")
+                    self.direction_flag_l = False
+
+        self.publish_wheel_speeds()
+
+        # self.get_logger().info(str(m1a) + " " +str(m1b) + " " +str(m2a) + " " +str(m2b) + " ")
+        # self.get_logger().info("Current Speed: " + str(self.right_current_speed_per) + " Target Speed: " + str(self.right_target_speed_per))
+
+
+    def motor_speed_set_callback(self, msg):
+        right_target_speed_rads = msg.data[0]
+        left_target_speed_rads = msg.data[1]
+
+        self.left_target_speed_rpm = (left_target_speed_rads / (2 * m.pi)) * 60
+        self.right_target_speed_rpm = (right_target_speed_rads / (2 * m.pi)) * 60
+
+        self.left_target_speed_per = (self.left_target_speed_rpm / self.max_rpm) * 100
+        self.right_target_speed_per = (self.right_target_speed_rpm / self.max_rpm) * 100
+
+        
+    def set_direction(self, direction, motor):
+        if motor == RIGHT:
+            if self.right_current_speed_per < self.acceleration and self.right_current_speed_per > -self.acceleration:
+                self.direction_flag_r = True
+                if direction == CW:
+                    lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
+                    lgpio.gpio_write(self.h, self.AIN2_PIN, 0)
+                    self.get_logger().info("Right Motor CW")
+                elif direction == CCW:
+                    lgpio.gpio_write(self.h, self.AIN1_PIN, 0)
+                    lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
+                    self.get_logger().info("Right Motor CCW")
+
+        elif motor == LEFT:
+            if self.left_current_speed_per < self.acceleration and self.left_current_speed_per > -self.acceleration:
+                self.direction_flag_l = True
+                if direction == CW:
+                    lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
+                    lgpio.gpio_write(self.h, self.BIN2_PIN, 0)
+                    self.get_logger().info("Left Motor CW")
+                elif direction == CCW:
+                    lgpio.gpio_write(self.h, self.BIN1_PIN, 0)
+                    lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
+                    self.get_logger().info("Left Motor CCW")
+
+
+    def publish_wheel_speeds(self):
+        self.right_current_speed_rpm = (self.right_current_speed_per / 100) * self.max_rpm
+        self.left_current_speed_rpm = (self.left_current_speed_per / 100) * self.max_rpm
+
+        right_current_speed_rads = (self.right_current_speed_rpm / 60) * 2 * m.pi
+        left_current_speed_rads = (self.left_current_speed_rpm / 60) * 2 * m.pi
+
+        msg_out = std_msgs.msg.Float32MultiArray()
+        msg_out.data = [right_current_speed_rads, left_current_speed_rads]
+
+        self.wheel_speed_publisher.publish(msg_out)
 
 
 def main(args=None):
@@ -158,11 +194,12 @@ def main(args=None):
 
     hardware_interface = HardwareInterface()
 
-    # This code prevents an error when th system is stopped with ctrl - c
+    # This code prevents an error when the system is stopped with ctrl - c
     try:
         rclpy.spin(hardware_interface)
     except KeyboardInterrupt:
-        pass
+        while hardware_interface.motorspeed > 0:
+            hardware_interface.motorspeed -= 0.01
     finally:
         hardware_interface.destroy_node()
         if rclpy.ok():

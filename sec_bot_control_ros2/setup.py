@@ -3,13 +3,12 @@ from glob import glob
 from setuptools import setup
 
 package_name = 'sec_bot_control_ros2'
-submodules = "sec_bot_control_ros2/submodules"
 
 setup(
     name=package_name,
     version='0.0.0',
     # Packages to export
-    packages=[package_name, submodules],
+    packages=[package_name],
     # Files we want to install, specifically launch files
     data_files=[
         # Install marker file in the package index
@@ -39,7 +38,7 @@ setup(
         'console_scripts': [
             'odom_publisher = sec_bot_control_ros2.odom_publisher:main',
             'robot_controller = sec_bot_control_ros2.robot_controller:main',
-            #'hardware_interface = sec_bot_control_ros2.hardware_interface:main',
+            'hardware_interface = sec_bot_control_ros2.hardware_interface:main',
         ],
     },
 )
