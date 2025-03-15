@@ -70,7 +70,7 @@ class RobotController(Node):
             pass
         else:
             msg_out = std_msgs.msg.Float32MultiArray()
-            msg_out.data = [wheel_speeds[1], wheel_speeds[0]]
+            msg_out.data = [self.right_wheel_speed, self.left_wheel_speed]
 
             self.motor_write_publisher.publish(msg_out)
 
