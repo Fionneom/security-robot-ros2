@@ -7,6 +7,10 @@ import numpy as np
 import os
 from ament_index_python.packages import get_package_share_directory
 
+import requests
+
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1352313250280378518/8ZPTXakmR7LysgmXsGtuxuy8z__8Tv3iyKaD5g18MSteUbupZakYDsItmlORTpDe24H5"
+
 class HumanDetector(Node):
     def __init__(self):
         super().__init__('human_detector')
@@ -25,8 +29,9 @@ class HumanDetector(Node):
         self.net = cv2.dnn.readNetFromCaffe(self.prototxt_path, self.model_path)
         self.get_logger().info('Model loaded successfully!')
 
-
         self.classes = {15: 'person'}
+
+        self.person_count = 0
 
     def image_callback(self, msg):
         try:
@@ -61,6 +66,12 @@ class HumanDetector(Node):
                         # Draw bounding box and label
                         cv2.rectangle(cv_image, (startX, startY), (endX, endY), (0, 255, 0), 2)
 
+            if human_count != self.person_count and human_count > 0:
+                cv2.imwrite('./image.jpg', cv_image)
+                self.send_notification()
+
+            self.person_count = human_count
+
             # Show the processed video feed
             cv2.imshow('Human Detection', cv_image)
             cv2.waitKey(1)  # Necessary for OpenCV window updates
@@ -69,6 +80,12 @@ class HumanDetector(Node):
 
         except Exception as e:
             self.get_logger().error(f'Error processing image: {e}')
+
+
+    def send_notification(self):
+        data = {"content": "Person Detected"}
+        files = {"file": open("./image.jpg", "rb")}
+        requests.post(DISCORD_WEBHOOK_URL, data = data, files = files)
 
 
 def main(args=None):

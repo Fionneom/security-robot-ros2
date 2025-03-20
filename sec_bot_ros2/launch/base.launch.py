@@ -34,24 +34,16 @@ def generate_launch_description():
         arguments=['-d', [os.path.join(get_package_share_directory('sec_bot_ros2'), 'rviz', 'rviz_config.rviz')]]
     )
 
-    # control = IncludeLaunchDescription(
-    #             PythonLaunchDescriptionSource([os.path.join(
-    #                 get_package_share_directory('sec_bot_ros2_control'),'launch','control.launch.py'
-    #             )]),
-    #             launch_arguments = {'use_sim_time': use_sim_time}.items()
-    # )
-
-    # foxglove = IncludeLaunchDescription(
-    #             XMLLaunchDescriptionSource([os.path.join(
-    #                 get_package_share_directory('foxglove_bridge'),'launch','foxglove_bridge_launch.xml'
-    #             )]),
-    #             launch_arguments = {'use_sim_time': use_sim_time}.items()
-    # )
+    detection = Node(
+        package='sec_bot_detection_ros2',
+        namespace='',
+        executable='human_detection',
+        name='human_detection',
+    )
 
 
     return LaunchDescription([
-        rsp,
+        # rsp,
         rviz,
-        # control,
-        # foxglove,
+        detection,
     ])
