@@ -24,12 +24,6 @@ class HardwareInterface(Node):
     def __init__(self):
         super().__init__('HardwareInterface')
 
-        # ME = Motor Encoder
-        self.ME1A_PIN = 21
-        self.ME1B_PIN = 20
-        self.ME2A_PIN = 16
-        self.ME2B_PIN = 25
-
         # Motor Driver
         self.PWMA_PIN = 18
         self.AIN2_PIN = 23
@@ -39,11 +33,6 @@ class HardwareInterface(Node):
         self.PWMB_PIN = 13
 
         self.h = lgpio.gpiochip_open(0)
-
-        lgpio.gpio_claim_input(self.h, self.ME1A_PIN)
-        lgpio.gpio_claim_input(self.h, self.ME1B_PIN)
-        lgpio.gpio_claim_input(self.h, self.ME2A_PIN)
-        lgpio.gpio_claim_input(self.h, self.ME2B_PIN)
 
         lgpio.gpio_claim_output(self.h, self.AIN1_PIN)
         lgpio.gpio_claim_output(self.h, self.AIN2_PIN)
@@ -205,8 +194,7 @@ def main(args=None):
     try:
         rclpy.spin(hardware_interface)
     except KeyboardInterrupt:
-        while hardware_interface.motorspeed > 0:
-            hardware_interface.motorspeed -= 0.01
+        pass
     finally:
         hardware_interface.destroy_node()
         if rclpy.ok():
