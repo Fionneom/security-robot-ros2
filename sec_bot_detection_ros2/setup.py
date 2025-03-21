@@ -26,6 +26,7 @@ setup(
     entry_points={
         'console_scripts': [
             'human_detection = sec_bot_detection_ros2.human_detection:main',
+            'lidar_object_detection = sec_bot_detection_ros2.lidar_object_detection:main',
         ],
     },
 )
