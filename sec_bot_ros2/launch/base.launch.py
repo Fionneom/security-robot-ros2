@@ -45,5 +45,5 @@ def generate_launch_description():
     return LaunchDescription([
         # rsp,
         rviz,
-        detection,
+        # detection,
     ])
