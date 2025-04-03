@@ -1,7 +1,5 @@
 """\
-ROS 2 node responsible for reading and writing to the Pico.
-Uses the MainController python class (see submodules folder)
-Also subscribes to lidar and radar safety nodes to stop when and object is detected
+ROS 2 node responsible for controlling the motor driver via GPIO pins
 """
 import lgpio
 
@@ -42,12 +40,13 @@ class HardwareInterface(Node):
         lgpio.gpio_claim_output(self.h, self.PWMA_PIN)
         lgpio.gpio_claim_output(self.h, self.PWMB_PIN)
 
+        # Initialises motor brake
         lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
         lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
         lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
         lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
 
-        self.max_acceleration = 3
+        self.max_acceleration = 4
         self.max_rpm = 150
 
         self.right_target_speed_rpm = 0
@@ -71,7 +70,8 @@ class HardwareInterface(Node):
 
 
     def timer_callback(self):
-        
+        # Sets motor speed and direction based on target
+
         if self.right_target_speed_per > self.right_current_speed_per:
             if self.right_target_speed_per - self.right_current_speed_per > self.right_current_acceleration:
                 self.set_direction(CW, RIGHT)
@@ -86,6 +86,7 @@ class HardwareInterface(Node):
             else:
                 self.right_current_speed_per = self.right_target_speed_per
 
+        # Brake motors when stationary
         if self.right_current_speed_per == 0 and self.left_target_speed_per == 0:
                 lgpio.gpio_write(self.h, self.AIN1_PIN, 1)
                 lgpio.gpio_write(self.h, self.AIN2_PIN, 1)
@@ -109,7 +110,7 @@ class HardwareInterface(Node):
                 lgpio.gpio_write(self.h, self.BIN1_PIN, 1)
                 lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
 
-
+        # Set PWM value to speed percentage
         lgpio.tx_pwm(self.h, self.PWMA_PIN, 1000, abs(self.right_current_speed_per))
         lgpio.tx_pwm(self.h, self.PWMB_PIN, 1000, abs(self.left_current_speed_per))
 
@@ -117,17 +118,23 @@ class HardwareInterface(Node):
 
 
     def motor_speed_set_callback(self, msg):
+        # Update target speed based on comand velocity
+
         right_target_speed_rads = msg.data[0]
         left_target_speed_rads = msg.data[1]
 
         self.left_target_speed_rpm = (left_target_speed_rads / (2 * m.pi)) * 60
         self.right_target_speed_rpm = (right_target_speed_rads / (2 * m.pi)) * 60
 
+        # Speed percentage: Percentage of the max speed
+
         left_old_speed_per = self.left_current_speed_per
         right_old_speed_per = self.right_current_speed_per
 
         self.left_target_speed_per = (self.left_target_speed_rpm / self.max_rpm) * 100
         self.right_target_speed_per = (self.right_target_speed_rpm / self.max_rpm) * 100
+
+        # Ensures wheels reach target speed in the same amount of time for predictable movement
 
         left_difference = abs(self.left_target_speed_per - left_old_speed_per)
         right_difference = abs(self.right_target_speed_per - right_old_speed_per)
@@ -145,8 +152,10 @@ class HardwareInterface(Node):
 
         self.get_logger().info("Steps: " + str(steps))
 
-        
+    
     def set_direction(self, direction, motor):
+        # Called every time a motor speed is updated, ensures motors are stationary before reversing direction to reduce back emf spikes
+
         if motor == RIGHT:
             if self.right_current_speed_per < self.max_acceleration and self.right_current_speed_per > -self.max_acceleration:
                 self.direction_flag_r = True
@@ -173,6 +182,8 @@ class HardwareInterface(Node):
 
 
     def publish_wheel_speeds(self):
+        # Updates controller with wheel speed. Should use encoders but currently sets to current predicted speed
+
         self.right_current_speed_rpm = (self.right_current_speed_per / 100) * self.max_rpm
         self.left_current_speed_rpm = (self.left_current_speed_per / 100) * self.max_rpm
 

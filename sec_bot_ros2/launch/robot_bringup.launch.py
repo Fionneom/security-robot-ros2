@@ -66,7 +66,7 @@ def generate_launch_description():
     return LaunchDescription([
         rsp,
         # rviz,
-        camera,
+        # camera,
         lidar,
         # detection,
         control,  

@@ -1,3 +1,7 @@
+"""\
+ROS 2 node which uses the MobileNet computer vision model to detect humans and send the image via Discord
+"""
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
@@ -15,23 +19,24 @@ class HumanDetector(Node):
     def __init__(self):
         super().__init__('human_detector')
         self.bridge = CvBridge()
-        self.subscription = self.create_subscription(
-            CompressedImage,
-            'camera/image_raw/compressed',
-            self.image_callback,
-            10)
-        
 
+        # Uses compressed image to improve speed
+        self.subscription = self.create_subscription(CompressedImage, 'camera/image_raw/compressed', self.image_callback,10)
+
+        # 
         package_dir = get_package_share_directory('sec_bot_detection_ros2')
         self.prototxt_path = os.path.join(package_dir, 'models', 'deploy.prototxt')
         self.model_path = os.path.join(package_dir, 'models', 'mobilenet_iter_73000.caffemodel')
 
         self.net = cv2.dnn.readNetFromCaffe(self.prototxt_path, self.model_path)
-        self.get_logger().info('Model loaded successfully!')
+        self.get_logger().info('Model loaded successfully')
 
+        # Model can be used to differentiate many objects, only humans being detected currently
         self.classes = {15: 'person'}
 
         self.person_count = 0
+
+        self.confidence_threshold = 0.75
 
     def image_callback(self, msg):
         try:
@@ -53,7 +58,7 @@ class HumanDetector(Node):
 
             for i in range(detections.shape[2]):
                 confidence = detections[0, 0, i, 2]
-                if confidence > 0.75:  # Confidence threshold
+                if confidence > self.confidence_threshold:  # Confidence threshold
                     class_id = int(detections[0, 0, i, 1])
 
                     if class_id in self.classes and self.classes[class_id] == 'person':
@@ -63,26 +68,28 @@ class HumanDetector(Node):
                         box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                         (startX, startY, endX, endY) = box.astype("int")
 
-                        # Draw bounding box and label
+                        # Draw bounding box
                         cv2.rectangle(cv_image, (startX, startY), (endX, endY), (0, 255, 0), 2)
 
+            # If the number of humans detected has changed, send a notification
             if human_count != self.person_count and human_count > 0:
                 cv2.imwrite('./image.jpg', cv_image)
                 self.send_notification()
 
             self.person_count = human_count
 
-            # Show the processed video feed
+            # Show the video feed
             cv2.imshow('Human Detection', cv_image)
-            cv2.waitKey(1)  # Necessary for OpenCV window updates
+            cv2.waitKey(1)
 
-            self.get_logger().info(f'Detected {human_count} human(s).')
+            self.get_logger().info('Detected ' + str(human_count) +' human(s).')
 
         except Exception as e:
-            self.get_logger().error(f'Error processing image: {e}')
+            self.get_logger().error('Error processing image: ' + str(e))
 
 
     def send_notification(self):
+        # Sends image to Discord via Webhook
         data = {"content": "Person Detected"}
         files = {"file": open("./image.jpg", "rb")}
         requests.post(DISCORD_WEBHOOK_URL, data = data, files = files)
