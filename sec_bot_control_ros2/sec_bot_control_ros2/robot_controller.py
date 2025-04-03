@@ -17,11 +17,8 @@ class RobotController(Node):
     def __init__(self):
         super().__init__('robot_controller')
 
-        # self.simulation_mode = self.get_parameter('use_sim_time').get_parameter_value().bool_value
         self.declare_parameter('simulation_mode', False)
-
         self.simulation_mode = self.get_parameter('simulation_mode').get_parameter_value().bool_value
-
 
         self.command_subscription = self.create_subscription(geometry_msgs.msg.Twist, 'cmd_vel', self.command_callback, 10)
         
@@ -47,6 +44,7 @@ class RobotController(Node):
         self.t1 = self.get_clock().now().nanoseconds * 1e-9
 
     def timer_callback(self):
+        # Only used when real hardware not available. Updates wheel speed based on current target
         msg_out = std_msgs.msg.Float32MultiArray()
         msg_out.data = [float(self.right_wheel_speed), float(self.left_wheel_speed)]
 
@@ -54,21 +52,16 @@ class RobotController(Node):
 
 
     def command_callback(self, msg):
+        # Updates target wheel speed based on command input
         linear_velocity = msg.linear
         angular_velocity = msg.angular
-
-        # self.get_logger().info('Linear: ' + str(linear_velocity) + '  Angular: ' + str(angular_velocity))
 
         wheel_speeds = self.twist_to_wheel_velocity(linear_velocity.x, angular_velocity.z)
 
         self.right_wheel_speed = wheel_speeds[0]
         self.left_wheel_speed = wheel_speeds[1]
 
-        # self.get_logger().info('Left: ' + str(wheel_speeds[1]) + '  Right: ' + str(wheel_speeds[0]))
-
-        if self.simulation_mode:
-            pass
-        else:
+        if not self.simulation_mode:
             msg_out = std_msgs.msg.Float32MultiArray()
             msg_out.data = [self.right_wheel_speed, self.left_wheel_speed]
 

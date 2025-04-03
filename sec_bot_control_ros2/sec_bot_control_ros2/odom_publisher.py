@@ -44,10 +44,8 @@ class OdomPublisher(Node):
 
         # Distance between wheels
         self.wheel_track = 0.2
-        # Diameter of the wheels
         self.wheel_diameter = 0.13
 
-        # Timer used to make sure everything stays in sync (converting nanoseconds to seconds)
         self.t1 = self.get_clock().now().nanoseconds * 1e-9
 
     # Updates the robot's position based on the speed of each wheel every 0.1 seconds
@@ -91,7 +89,7 @@ class OdomPublisher(Node):
         odom_transform.transform.translation.x = float(self.odom_x)
         odom_transform.transform.translation.y = float(self.odom_y)
 
-        # Converts roll pitch and yaw into quaternions. We only need the z and ω component
+        # Converts roll pitch and yaw into quaternions
         q = quaternion_from_euler(0, 0, -self.odom_theta)
         odom_transform.transform.rotation.z = q[2]
         odom_transform.transform.rotation.w = q[3]
