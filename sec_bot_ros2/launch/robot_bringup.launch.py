@@ -47,13 +47,13 @@ def generate_launch_description():
         name='human_detection',
     )
 
-    # rviz = Node(
-    #     package='rviz2',
-    #     namespace='',
-    #     executable='rviz2',
-    #     name='rviz2',
-    #     arguments=['-d', [os.path.join(get_package_share_directory('sec_bot_ros2'), 'rviz', 'rviz_config.rviz')]]
-    # )
+    rviz = Node(
+        package='rviz2',
+        namespace='',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', [os.path.join(get_package_share_directory('sec_bot_ros2'), 'rviz', 'rviz_config.rviz')]]
+    )
 
     control = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
@@ -65,8 +65,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         rsp,
-        # rviz,
-        # camera,
+        rviz,
+        camera,
         lidar,
         # detection,
         control,  
