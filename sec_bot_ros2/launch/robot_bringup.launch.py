@@ -55,6 +55,13 @@ def generate_launch_description():
         arguments=['-d', [os.path.join(get_package_share_directory('sec_bot_ros2'), 'rviz', 'rviz_config.rviz')]]
     )
 
+    face = Node(
+        package='articubot_one_ui',
+        namespace='',
+        executable='play_face',
+        name='play_face',
+    )
+
     control = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
                     get_package_share_directory('sec_bot_control_ros2'),'launch','control.launch.py'
@@ -65,10 +72,11 @@ def generate_launch_description():
 
     return LaunchDescription([
         rsp,
-        rviz,
+        # rviz,
         camera,
         lidar,
         # detection,
         control,  
         # foxglove,
+        face
     ])

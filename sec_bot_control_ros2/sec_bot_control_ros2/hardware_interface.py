@@ -53,8 +53,8 @@ class HardwareInterface(Node):
         lgpio.gpio_write(self.h, self.BIN1_PIN, 0)
         lgpio.gpio_write(self.h, self.BIN2_PIN, 1)
 
-        self.max_acceleration = 3
-        self.max_rpm = 120
+        self.max_acceleration = 4
+        self.max_rpm = 150
 
         self.right_target_speed_rpm = 0
         self.right_current_speed_rpm = 0
@@ -70,7 +70,7 @@ class HardwareInterface(Node):
         self.left_current_acceleration = 0
         self.old_speed_right = 0
 
-        timer_period = 0.05  # seconds
+        timer_period = 0.025  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         self.motor_speed_subscription = self.create_subscription(std_msgs.msg.Float32MultiArray, 'robot_control/wheel_speeds_set', self.motor_speed_set_callback, 10) 
@@ -121,13 +121,13 @@ class HardwareInterface(Node):
 
         # Set PWM value to speed percentage
 
-        if self.right_current_speed_per != self.old_speed_right:
-            self.pi.set_PWM_dutycycle(self.PWMA_PIN, round(abs((self.right_current_speed_per/100)*255)))
+        if self.right_current_speed_per != self.old_speed_right and self.right_current_speed_per < 100:
+            self.pi.set_PWM_dutycycle(self.PWMA_PIN, round(abs((self.right_current_speed_per/100)*254)))
             self.old_speed_right = self.right_current_speed_per
             self.get_logger().info("PWM" + str(self.right_current_speed_per))
         
-        if self.left_current_speed_per != self.old_speed_left:
-            self.pi.set_PWM_dutycycle(self.PWMB_PIN, round(abs((self.left_current_speed_per/100)*255)))
+        if self.left_current_speed_per != self.old_speed_left and self.left_current_speed_per < 100:
+            self.pi.set_PWM_dutycycle(self.PWMB_PIN, round(abs((self.left_current_speed_per/100)*254)))
             self.old_speed_left = self.left_current_speed_per
 
         self.publish_wheel_speeds()
